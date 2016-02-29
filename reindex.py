@@ -1,6 +1,20 @@
-from elasticsearch import Elasticsearch
-from elasticsearch.client import IndicesClient
-from elasticsearch import helpers
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Copyright  2016, Shyam Anand <shyamwdr@gmail.com>
+
+
 import time
 import json
 import logging
@@ -9,90 +23,88 @@ from logging import Formatter
 from datetime import datetime
 import sys
 import argparse
+from Reindexer import Reindexer
 
-def set_logger():
+def init_logger(log_file, max_bytes, backup_count, verbose):
 	logger = logging.getLogger("main")
-	log_file_handler = RotatingFileHandler(filename = "./error.log", maxBytes = 10*10*10*1024, backupCount = 50)
+	logger.setLevel(logging.DEBUG)
+
+	log_file_handler = RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=backup_count)
 	log_file_handler.setLevel(logging.DEBUG)
-	log_file_handler.setFormatter(Formatter('%(message)s\n'))
+	log_file_handler.setFormatter(Formatter("%(asctime)-15s [%(levelname)s] - %(message)s"))
+
+	stream_handler = logging.StreamHandler(sys.stdout)
+	if verbose:
+		stream_handler.setLevel(logging.DEBUG)
+	else:
+		stream_handler.setLevel(logging.INFO)
+	stream_handler.setFormatter(Formatter("%(asctime)-15s [%(levelname)s] - %(message)s"))
+
 	logger.addHandler(log_file_handler)
+	logger.addHandler(stream_handler)
+
 	return logger
 
-def get_mappings(index_type, mapping_source):
-	
-	mapping = {index_type:{}}
-	fobj = open(mapping_source)
-	for line in fobj.readlines():
-		if len(line.strip()) > 0:
-			fields_mapping = json.loads(line)
-			mapping[index_type]['properties'] = fields_mapping
-			break
-	return mapping
-
 if __name__ == '__main__':
-
-	logger = set_logger()
+	LOGFILE_MAX_BYTES = 25 * 1024 * 1024 # 25 MB
+	LOGFILE_BACKUP_COUNT = 50
 
 	argparser = argparse.ArgumentParser(description='Reindex Elasticsearch', conflict_handler='resolve')
-	argparser.add_argument('-h', '--host', default='localhost', help="Elasticsearch host")
-	argparser.add_argument('-f', '--file',  help="File with JSON mapping", required=True)
+
+	# Elasticsearch parameters
+	argparser.add_argument('-m', '--mapping-file', help="File with JSON mapping", required=True)
+	argparser.add_argument('-h', '--host', default='localhost', help="Elasticsearch host (default localhost)")
+	argparser.add_argument('-p', '--port', default='9200', help="Elasticsearch port (default 9200)")
 	argparser.add_argument('-a', '--alias', help="Alias for the index", required=True)
 	argparser.add_argument('-s', '--source-index', help="Source index", required=True)
-	argparser.add_argument('-t', '--target-index', help="Target index (default: source_index_[YYMMDDhhmmss]")
+	argparser.add_argument('-t', '--target-index', help="Target index (default: source_index_[YYMMDDhhmmss])")
 	argparser.add_argument("-y", "--source-type", help="Source type", required=True)
 	argparser.add_argument("--target-type", help="Target type")
-	argparser.add_argument("-i", "--interactive", action='store_true', help="Confirm before taking action")
+
+	# Logging parameters
+	argparser.add_argument("--log-file", default="log/reindex.log")
+	argparser.add_argument("--max-bytes", type=long, default=LOGFILE_MAX_BYTES, help="Max file size per log file")
+	argparser.add_argument("--backup-count", type=int, default=LOGFILE_BACKUP_COUNT)
+
+	# Misc params
 	argparser.add_argument("-v", "--verbose", action='store_true', help="Verbose")
-	argparser.add_argument("--dry-run", action='store_true', help="Dry run. Reindexing will not be done if this option is set.")
+	group = argparser.add_mutually_exclusive_group()
+	group.add_argument("-i", "--interactive", action='store_true', help="Confirm before taking action")
+	group.add_argument("--dry-run", action='store_true', default=False, help="Dry run. Reindexing will not be done if this option is set.")
 
 	args = argparser.parse_args()
 
 	if args.target_index == None:
-		 args.target_index = args.source_index + "_" + datetime.now().strftime('%Y%m%d%H%M%S')
+	    args.target_index = args.source_index + "_" + datetime.now().strftime('%Y%m%d%H%M%S')
 	if args.target_type == None:
-		args.target_type = args.source_type
+	    args.target_type = args.source_type
 
-	if args.verbose:
-		print "Elasticsearch host: " + args.host
-		print "Source index: " + args.source_index
-		print "Target index: " + args.target_index
-		print "Source index type:" + args.source_type
-		print "Target index type: " + args.target_type
+	reindexer = Reindexer(
+		args.host, args.port, args.mapping_file, 
+		args.alias, args.source_index, args.target_index,
+		args.source_type, args.target_type
+	)
+
+	logger = init_logger(args.log_file, args.max_bytes, args.backup_count, args.verbose)
+	logger.info("Elasticsearch host: " + reindexer.getHost())
+	logger.info("Source index: " + reindexer.getSourceIndex())
+	logger.info("Target index: " + reindexer.getTargetIndex())
+	logger.info("Source index type: " + reindexer.getSourceType())
+	logger.info("Target index type: " + reindexer.getTargetType())
 
 	if args.interactive:
-		u_input = raw_input("Continue? (y/n): ")
-	else: 
-		u_input = 'y'
+	    args.dry_run = False if (raw_input("\nContinue? (y/n): ") == 'y') else True
+	    logger.debug("User confirmation to proceed: " + ('no' if args.dry_run else 'yes'))
 
-
-	if u_input == 'y':
+	if args.dry_run == False:
+		logger.debug("Calling reindexer.reindex")
 		try:
-			elastic_client = Elasticsearch([{"host":host,"port":"9200"}])
-			index_client = IndicesClient(elastic_client)
-			
-			mapping = get_mappings(target_index_type)
-			body = None
-			if mapping[target_index_type] is not None:
-				body = {"mappings": mapping}
-
-			#creating new index with necessory fields mapping
-			index_client.create(index=target_index, body=body) #, master_timeout=10, timeout=10
-
-			# reindexind data from source index to target index
-			helpers.reindex(client=elastic_client, source_index=source_index, target_index=target_index)
-			
-			#creating alias for target index
-			alias = {'actions': []}
-			remove_action = {"remove": {"index": source_index, "alias": index_alias}}
-			add_action = {"add": {"index": target_index, "alias": index_alias}}
-			alias['actions'].append(remove_action)
-			alias['actions'].append(add_action)
-			index_client.update_aliases(body=alias)
-
-			#deleteing the source index
-			index_client.delete(index=source_index)
-
+			reindexer.reindex()
 		except Exception, e:
-			print e
-	else:
-		print 'cancel'
+			logger.error(e)
+	
+	logger.info("Exiting")
+
+
+
+
