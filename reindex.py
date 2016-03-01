@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +22,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from logging import Formatter
 from datetime import datetime
-import sys
+import sys, traceback
 import argparse
 from Reindexer import Reindexer
 
@@ -38,7 +39,7 @@ def init_logger(log_file, max_bytes, backup_count, verbose):
 		stream_handler.setLevel(logging.DEBUG)
 	else:
 		stream_handler.setLevel(logging.INFO)
-	stream_handler.setFormatter(Formatter("%(asctime)-15s [%(levelname)s] - %(message)s"))
+	stream_handler.setFormatter(Formatter("[%(levelname)s] %(message)s"))
 
 	logger.addHandler(log_file_handler)
 	logger.addHandler(stream_handler)
@@ -97,15 +98,34 @@ if __name__ == '__main__':
 	    args.dry_run = False if (raw_input("\nContinue? (y/n): ") == 'y') else True
 	    logger.debug("User confirmation to proceed: " + ('no' if args.dry_run else 'yes'))
 
-	if args.dry_run == False:
-		logger.debug("Calling reindexer.reindex")
-		try:
-			reindexer.create_mapping()
-			logger.debug("Mapping body -- " + json.dumps(reindexer.getMapping(), indent=2))
-			# reindexer.reindex()
-		except Exception, e:
-			logger.error(e)
-	
+	while True:
+		u_input = raw_input('> ')
+		tokens = u_input.split()
+		if tokens[0] == 'create':
+			if tokens[1] == 'index':
+				reindexer.create_index(tokens[2])
+			elif tokens[1] == 'alias':
+				reindexer.add_alias(tokens[2], tokens[3])
+
+	try:
+		reindexer.create_mapping()
+		if args.dry_run:
+			logger.info("Mapping body -- " + json.dumps(reindexer.getMapping(), indent=2))
+		else:
+			reindexer.reindex()
+
+	except Exception, e:
+		logger.error(e)
+		# traceback_details = { 
+		# 						'filename': sys.exc_info()[2].tb_frame.f_code.co_filename,
+		# 						'line': sys.exc_info()[2].tb_lineno,
+		# 						'name': sys.exc_info()[2].tb_frame.f_code.co_name,
+		# 						'type': sys.exc_info()[0].__name__,
+		# 						'message': e.error #sys.exc_info()[1].message
+		# 					}
+		# error_reason = e[2]['error']['caused_by']['reason']
+		# traceback_template = "%(type)s: %(message)s: " + error_reason + " at line %(line)s in %(filename)s"
+		# logger.error( traceback_template % traceback_details )
 	logger.info("Exiting")
 
 
