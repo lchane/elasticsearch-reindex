@@ -69,9 +69,9 @@ class Reindexer:
 
 		#creating alias for target index
 		alias = {'actions': []}
-		remove_action = {"remove": {"index": self.__source_index, "alias": self.__alias}}
+		# remove_action = {"remove": {"index": self.__source_index, "alias": self.__alias}}
 		add_action = {"add": {"index": self.__target_index, "alias": self.__alias}}
-		alias['actions'].append(remove_action)
+		# alias['actions'].append(remove_action)
 		alias['actions'].append(add_action)
 
 		#deleteing the source index
