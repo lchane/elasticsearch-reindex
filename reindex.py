@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Copyright  2016, Shyam Anand <shyamwdr@gmail.com>
+# Copyright 2016, Shyam Anand <shyamwdr@gmail.com>
 
 
 import time
@@ -97,15 +97,16 @@ if __name__ == '__main__':
 	    args.dry_run = False if (raw_input("\nContinue? (y/n): ") == 'y') else True
 	    logger.debug("User confirmation to proceed: " + ('no' if args.dry_run else 'yes'))
 
-	if args.dry_run == False:
-		logger.debug("Calling reindexer.reindex")
-		try:
-			reindexer.create_mapping()
-			logger.debug("Mapping body -- " + json.dumps(reindexer.getMapping(), indent=2))
-			# reindexer.reindex()
-		except Exception, e:
-			logger.error(e)
-	
+
+	try:
+		reindexer.create_mapping()
+		if args.dry_run:
+			logger.info("Mapping body -- " + json.dumps(reindexer.getMapping(), indent=2))
+		else:
+			reindexer.reindex()
+	except Exception, e:
+		logger.error(e)
+
 	logger.info("Exiting")
 
 

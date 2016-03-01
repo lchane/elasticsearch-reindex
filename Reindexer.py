@@ -11,7 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Copyright  2016, Shyam Anand <shyamwdr@gmail.com>
+# Copyright 2016, Shyam Anand <shyamwdr@gmail.com>
 
 
 from elasticsearch import Elasticsearch
@@ -44,7 +44,7 @@ class Reindexer:
 	    for line in fobj.readlines():
 	        if len(line.strip()) > 0:
 	            fields_mapping = json.loads(line)
-	            mapping[self.__source_type]['properties'] = fields_mapping
+	            mapping[self.__source_type] = fields_mapping
 	            break
 	    return mapping
 
@@ -69,14 +69,14 @@ class Reindexer:
 
 		#creating alias for target index
 		alias = {'actions': []}
-		remove_action = {"remove": {"index": source_index, "alias": index_alias}}
-		add_action = {"add": {"index": target_index, "alias": index_alias}}
+		remove_action = {"remove": {"index": self.__source_index, "alias": self.__alias}}
+		add_action = {"add": {"index": self.__target_index, "alias": self.__alias}}
 		alias['actions'].append(remove_action)
 		alias['actions'].append(add_action)
-		index_client.update_aliases(body=alias)
 
 		#deleteing the source index
-		index_client.delete(index=source_index)
+		index_client.delete(index=self.__source_index)
+		index_client.update_aliases(body=alias)
 
 
 	def getHost(self):
