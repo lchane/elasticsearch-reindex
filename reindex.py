@@ -89,6 +89,7 @@ if __name__ == '__main__':
 	logger.info("Elasticsearch host: " + reindexer.getHost())
 	logger.info("Source index: " + reindexer.getSourceIndex())
 	logger.info("Target index: " + reindexer.getTargetIndex())
+	logger.info("Alias: " + reindexer.getAlias())
 	logger.info("Source index type: " + reindexer.getSourceType())
 	logger.info("Target index type: " + reindexer.getTargetType())
 
@@ -99,7 +100,9 @@ if __name__ == '__main__':
 	if args.dry_run == False:
 		logger.debug("Calling reindexer.reindex")
 		try:
-			reindexer.reindex()
+			reindexer.create_mapping()
+			logger.debug("Mapping body -- " + json.dumps(reindexer.getMapping(), indent=2))
+			# reindexer.reindex()
 		except Exception, e:
 			logger.error(e)
 	

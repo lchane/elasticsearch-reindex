@@ -7,7 +7,7 @@ Dependency: elasticsearch
 
 Usage:
 
-    $ reindex.py [--help] [-h HOST] -f FILE -a ALIAS -s SOURCE_INDEX
+    $ python reindex.py [--help] [-h HOST] -f FILE -a ALIAS -s SOURCE_INDEX
                   [-t TARGET_INDEX] -y SOURCE_TYPE [--target-type TARGET_TYPE]
                   [-i] [-v] [--dry-run]
 
@@ -28,5 +28,4 @@ Usage:
                         Target type
       -i, --interactive     Confirm before taking action
       -v, --verbose         Verbose
-      --dry-run             Dry run. Reindexing will not be done if this option is
-                        set.
+      --dry-run             To do a dry run.

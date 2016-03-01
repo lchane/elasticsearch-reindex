@@ -38,7 +38,7 @@ class Reindexer:
 		self.__source_type 	= source_type
 		self.__target_type 	= target_type
 
-	def get_mappings(self):
+	def __get_mappings(self):
 	    mapping = {self.__target_type: {}}
 	    fobj = open(self.__mapping_file)
 	    for line in fobj.readlines():
@@ -48,35 +48,35 @@ class Reindexer:
 	            break
 	    return mapping
 
+	def create_mapping(self):
+
+		mapping = self.__get_mappings()
+
+		self.__body = None
+		if mapping[self.__target_type] is not None:
+			self.__body = {"mappings": mapping}
+
 	def reindex(self):
-		
+
 		elastic_client = Elasticsearch([{"host":self.__host,"port":self.__port}])
 		index_client = IndicesClient(elastic_client)
 
-		mapping = self.get_mappings()
+		#Create new index with necessory fields mapping
+		index_client.create(index=self.__target_index, body=self.__body) #, master_timeout=10, timeout=10
 
-		body = None
-		if mapping[self.__target_type] is not None:
-			body = {"mappings": mapping}
+		# reindexind data from source index to target index
+		helpers.reindex(client=elastic_client, source_index=self.__source_index, target_index=self.__target_index)
 
-		print body
+		#creating alias for target index
+		alias = {'actions': []}
+		remove_action = {"remove": {"index": source_index, "alias": index_alias}}
+		add_action = {"add": {"index": target_index, "alias": index_alias}}
+		alias['actions'].append(remove_action)
+		alias['actions'].append(add_action)
+		index_client.update_aliases(body=alias)
 
-		# #Create new index with necessory fields mapping
-		# index_client.create(index=target_index, body=body) #, master_timeout=10, timeout=10
-
-		# # reindexind data from source index to target index
-		# helpers.reindex(client=elastic_client, source_index=source_index, target_index=target_index)
-
-		# #creating alias for target index
-		# alias = {'actions': []}
-		# remove_action = {"remove": {"index": source_index, "alias": index_alias}}
-		# add_action = {"add": {"index": target_index, "alias": index_alias}}
-		# alias['actions'].append(remove_action)
-		# alias['actions'].append(add_action)
-		# index_client.update_aliases(body=alias)
-
-		# #deleteing the source index
-		# index_client.delete(index=source_index)
+		#deleteing the source index
+		index_client.delete(index=source_index)
 
 
 	def getHost(self):
@@ -88,9 +88,15 @@ class Reindexer:
 	def getTargetIndex(self):
 		return self.__target_index
 
+	def getAlias(self):
+		return self.__alias
+
 	def getSourceType(self):
 		return self.__source_type
 
 	def getTargetType(self):
 		return self.__target_type
+
+	def getMapping(self):
+		return self.__body
 
